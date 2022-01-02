@@ -4,6 +4,7 @@
 #define GL_SILENCE_DEPRECATION
 
 #include <GLFW/glfw3.h>
+#include <OpenGL/gl3.h>
 
 void warning(const std::string& message) {
     std::cerr << "WARNING: " << message << std::endl;
@@ -36,21 +37,40 @@ layout (location = 0) in vec3 Position;                                       \n
                                                                               \n\
 void main()                                                                   \n\
 {                                                                             \n\
-    gl_Position = vec4(0.5 * Position.x, 0.5 * Position.y, Position.z, 1.0);  \n\
+    gl_Position = vec4(.5 * Position.x, .5 * Position.y, Position.z, 1.0);  \n\
 }";
 
-const char* kFragmentShader = "                                               \n\
+const char* pVF = "                                               \n\
 #version 330                                                                  \n\
                                                                               \n\
 out vec4 FragColor;                                                           \n\
                                                                               \n\
 void main()                                                                   \n\
 {                                                                             \n\
-    FragColor = vec4(1.0, 0.0, 0.0, 1.0);                                     \n\
+    FragColor = vec4(1.0, 1.0, 0.0, 1.0);                                     \n\
 }";
 
-void add_shader() {
+void add_shader(GLuint program, const char* text, GLenum type) {
+    auto shader = glCreateShader(type);
+    if (!shader) {
+        fatal("Unable to create shader");
+    }
 
+    const GLchar* sources[] = {text};
+    const GLint lengths[] = {(GLint)strlen(text)};
+
+    glShaderSource(shader, 1, sources, lengths);
+    glCompileShader(shader);
+
+    GLint result;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
+    if (!result) {
+        GLchar buffer[1024];
+        glGetShaderInfoLog(shader, sizeof(buffer), nullptr, buffer);
+        fatal(std::string("Unable to compile shader:\n") + buffer);
+    }
+
+    glAttachShader(program, shader);
 }
 
 void setup_shaders() {
@@ -58,6 +78,9 @@ void setup_shaders() {
     if (!program) {
         fatal("Unable to create program");
     }
+
+    add_shader(program, pVS, GL_VERTEX_SHADER);
+    add_shader(program, pVF, GL_FRAGMENT_SHADER);
 
     glLinkProgram(program);
 
@@ -70,7 +93,9 @@ void setup_shaders() {
     glValidateProgram(program);
     glGetProgramiv(program, GL_VALIDATE_STATUS, &result);
     if (!result) {
-        fatal("Unable to validate shaders");
+        GLchar buffer[1024];
+        glGetProgramInfoLog(program, sizeof(buffer), nullptr, buffer);
+        fatal(std::string("Unable to validate shader:\n") + buffer);
     }
 
     glUseProgram(program);
@@ -80,6 +105,11 @@ int main(int argc, const char* argv[]) {
     if (!glfwInit()) {
         fatal("Unable to initalize GLFW");
     }
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     auto window = glfwCreateWindow(500, 500, "Fluids", nullptr, nullptr);
     if (!window) {
@@ -97,6 +127,10 @@ int main(int argc, const char* argv[]) {
         Vector { 1.0f, -1.0f, 0.0f },
         Vector { 0.0f, 1.0f, 0.0f },
     };
+
+    GLuint VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
 
     GLuint VBO;
     glGenBuffers(2, &VBO);

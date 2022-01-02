@@ -3,3 +3,4 @@ CMakeFiles
 cmake_install.cmake
 libmain.a
 Makefile
+.vscode

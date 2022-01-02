@@ -15,6 +15,9 @@ target_link_libraries(main glfw)
 find_package(OpenGL REQUIRED)
 target_link_libraries(main OpenGL::GL)
 
+find_package(fmt)
+target_link_libraries(main fmt::fmt)
+
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS} -I/usr/local/lib -framework Cocoa -framework IOKit -framework CoreVideo -framework OpenGL -lglfw")
 
 add_executable(fluids main)
