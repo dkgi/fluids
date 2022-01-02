@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <cmath>
 
 #define GL_SILENCE_DEPRECATION
 
@@ -35,9 +36,11 @@ const char* pVS = "                                                           \n
                                                                               \n\
 layout (location = 0) in vec3 Position;                                       \n\
                                                                               \n\
+uniform float scale;                                                         \n\
+                                                                              \n\
 void main()                                                                   \n\
 {                                                                             \n\
-    gl_Position = vec4(.5 * Position.x, .5 * Position.y, Position.z, 1.0);  \n\
+    gl_Position = vec4(scale * Position.x, scale * Position.y, Position.z, 1.0);  \n\
 }";
 
 const char* pVF = "                                               \n\
@@ -73,7 +76,7 @@ void add_shader(GLuint program, const char* text, GLenum type) {
     glAttachShader(program, shader);
 }
 
-void setup_shaders() {
+GLuint setup_shaders() {
     GLuint program = glCreateProgram();
     if (!program) {
         fatal("Unable to create program");
@@ -99,6 +102,8 @@ void setup_shaders() {
     }
 
     glUseProgram(program);
+
+    return glGetUniformLocation(program, "scale");
 }
 
 int main(int argc, const char* argv[]) {
@@ -138,10 +143,15 @@ int main(int argc, const char* argv[]) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    setup_shaders();
+
+    GLuint scale = setup_shaders();
+    glUniform1f(scale, 1.0);
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT);
+
+        auto time = glfwGetTime();
+        glUniform1f(scale, sin(time));
 
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
