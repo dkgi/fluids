@@ -31,29 +31,24 @@ struct Vector {
     float x, y, z;
 };
 
-const char* pVS = "                                                           \n\
-#version 330                                                                  \n\
-                                                                              \n\
-layout (location = 0) in vec3 Position;                                       \n\
-                                                                              \n\
-uniform float scale;                                                         \n\
-                                                                              \n\
-void main()                                                                   \n\
-{                                                                             \n\
-    gl_Position = vec4(scale * Position.x, scale * Position.y, Position.z, 1.0);  \n\
-}";
+const char* kVertexShader = R"(
+#version 330
+layout (location = 0) in vec3 Position;
+uniform float scale;
+void main() {
+    gl_Position = vec4(scale * Position.x, scale * Position.y, Position.z, 1.0);
+}
+)";
 
-const char* pVF = "                                               \n\
-#version 330                                                                  \n\
-                                                                              \n\
-out vec4 FragColor;                                                           \n\
-                                                                              \n\
-void main()                                                                   \n\
-{                                                                             \n\
-    FragColor = vec4(1.0, 1.0, 0.0, 1.0);                                     \n\
-}";
+const char* kFragmentShader = R"(
+#version 330
+out vec4 FragColor;
+void main() {
+    FragColor = vec4(1.0, 1.0, 0.0, 1.0);
+}
+)";
 
-void add_shader(GLuint program, const char* text, GLenum type) {
+GLuint create_shader(const char* text, GLenum type) {
     auto shader = glCreateShader(type);
     if (!shader) {
         fatal("Unable to create shader");
@@ -73,7 +68,7 @@ void add_shader(GLuint program, const char* text, GLenum type) {
         fatal(std::string("Unable to compile shader:\n") + buffer);
     }
 
-    glAttachShader(program, shader);
+    return shader;
 }
 
 GLuint setup_shaders() {
@@ -82,12 +77,11 @@ GLuint setup_shaders() {
         fatal("Unable to create program");
     }
 
-    add_shader(program, pVS, GL_VERTEX_SHADER);
-    add_shader(program, pVF, GL_FRAGMENT_SHADER);
-
-    glLinkProgram(program);
+    glAttachShader(program, create_shader(kVertexShader, GL_VERTEX_SHADER));
+    glAttachShader(program, create_shader(kFragmentShader, GL_FRAGMENT_SHADER));
 
     GLint result;
+    glLinkProgram(program);
     glGetProgramiv(program, GL_LINK_STATUS, &result);
     if (!result) {
         fatal("Unable to link shaders");
@@ -102,8 +96,7 @@ GLuint setup_shaders() {
     }
 
     glUseProgram(program);
-
-    return glGetUniformLocation(program, "scale");
+    return program;
 }
 
 int main(int argc, const char* argv[]) {
@@ -144,7 +137,9 @@ int main(int argc, const char* argv[]) {
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    GLuint scale = setup_shaders();
+    GLuint shaders = setup_shaders();
+
+    auto scale = glGetUniformLocation(shaders, "scale");
     glUniform1f(scale, 1.0);
 
     while (!glfwWindowShouldClose(window)) {
