@@ -33,10 +33,10 @@ struct Vector {
 
 const char* kVertexShader = R"(
 #version 330
-layout (location = 0) in vec3 Position;
-uniform float scale;
+layout (location = 0) in vec3 position;
+uniform mat4 world;
 void main() {
-    gl_Position = vec4(scale * Position.x, scale * Position.y, Position.z, 1.0);
+    gl_Position = world * vec4(position, 1.0);
 }
 )";
 
@@ -139,14 +139,22 @@ int main(int argc, const char* argv[]) {
 
     GLuint shaders = setup_shaders();
 
-    auto scale = glGetUniformLocation(shaders, "scale");
-    glUniform1f(scale, 1.0);
+    auto world = glGetUniformLocation(shaders, "world");
+    float transformation[4][4] = {
+        {1.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 1.0f},
+    };
+    glUniformMatrix4fv(world, 1, GL_TRUE, &transformation[0][0]);
+
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT);
 
         auto time = glfwGetTime();
-        glUniform1f(scale, sin(time));
+        transformation[0][3] = sin(time);
+        glUniformMatrix4fv(world, 1, GL_TRUE, &transformation[0][0]);
 
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
