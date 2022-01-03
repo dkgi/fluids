@@ -35,16 +35,19 @@ const char* kVertexShader = R"(
 #version 330
 layout (location = 0) in vec3 position;
 uniform mat4 world;
+out vec4 Color;
 void main() {
     gl_Position = world * vec4(position, 1.0);
+    Color = vec4(clamp(position, 0.0, 1.0), 1.0);
 }
 )";
 
 const char* kFragmentShader = R"(
 #version 330
+in vec4 Color;
 out vec4 FragColor;
 void main() {
-    FragColor = vec4(1.0, 1.0, 0.0, 1.0);
+    FragColor = Color;
 }
 )";
 
@@ -122,6 +125,7 @@ int main(int argc, const char* argv[]) {
 
     Vector vertices[] = {
         Vector { -1.0f, -1.0f, 0.0f },
+        Vector { 0.0f, -1.0f, 1.0f },
         Vector { 1.0f, -1.0f, 0.0f },
         Vector { 0.0f, 1.0f, 0.0f },
     };
@@ -132,8 +136,14 @@ int main(int argc, const char* argv[]) {
 
     GLuint VBO;
     glGenBuffers(2, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);  // ??: necessary before drawing?
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    GLuint IBO;
+    GLuint indices[] = {0, 3, 1, 1, 3, 2, 2, 3, 0, 0, 2, 1};
+    glGenBuffers(1, &IBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -153,13 +163,17 @@ int main(int argc, const char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT);
 
         auto time = glfwGetTime();
-        transformation[0][3] = sin(time);
+        transformation[0][0] = cos(time);
+        transformation[0][2] = -sin(time);
+        transformation[2][0] = sin(time);
+        transformation[2][2] = cos(time);
         glUniformMatrix4fv(world, 1, GL_TRUE, &transformation[0][0]);
 
         glEnableVertexAttribArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-        glDrawArrays(GL_TRIANGLES, 0, sizeof(vertices));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0);
 
         glDisableVertexAttribArray(0);
 
