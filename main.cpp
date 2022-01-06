@@ -17,9 +17,20 @@ void fatal(const std::string& message) {
     std::exit(1);
 }
 
+struct State {
+    bool terminated = false;
+    bool key_pressed[1024] = {};
+} state;
+
 void on_key(GLFWwindow* window, int key, int /* scancode */, int action, int /* mods */) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        state.terminated = true;
+    }
+    if (action == GLFW_PRESS) {
+        state.key_pressed[key] = true;
+    }
+    if (action == GLFW_RELEASE) {
+        state.key_pressed[key] = false;
     }
 }
 
@@ -89,7 +100,7 @@ struct Matrix4f {
             for (int j = 0; j < 4; j++) {
                 float product = 0.0f;
                 for (int k = 0; k < 4; k++) {
-                    product += data[i][k] * other.data[j][k];
+                    product += this->data[i][k] * other.data[j][k];
                 }
                 result.data[j][i] = product;
             }
@@ -122,13 +133,44 @@ std::ostream& operator<<(std::ostream& out, const Matrix4f& matrix) {
     return out << "}";
 }
 
+struct Camera {
+    float position[3] = {-.5f, -.5f, -.5f};
+
+    void move(const State& state, double delta) {
+        double rate = 1.0;
+        if (state.key_pressed[GLFW_KEY_LEFT]) {
+            position[0] += rate * delta;
+        }
+        if (state.key_pressed[GLFW_KEY_RIGHT]) {
+            position[0] -= rate * delta;
+        }
+        if (state.key_pressed[GLFW_KEY_DOWN]) {
+            position[1] += rate * delta;
+        }
+        if (state.key_pressed[GLFW_KEY_UP]) {
+            position[1] -= rate * delta;
+        }
+    }
+
+    Matrix4f getTransform() const {
+        return Matrix4f::identity()
+            // .multiply(Matrix4f::rotation(-.78, Axis::X))
+            // .multiply(Matrix4f::rotation(-.78, Axis::Y))
+            .multiply(
+                Matrix4f::translation(
+                    position[0],
+                    position[1],
+                    position[2]));
+    }
+} camera;
+
 const char* kVertexShader = R"(
 #version 330
 layout (location = 0) in vec3 position;
-uniform mat4 gWorld;
+uniform mat4 gTransform;
 out vec4 Color;
 void main() {
-    gl_Position = gWorld * vec4(position, 1.0);
+    gl_Position = gTransform * vec4(position, 1.0);
     Color = vec4(1.0, 1.0, 1.0, 1.0);
 }
 )";
@@ -257,16 +299,19 @@ int main(int argc, const char* argv[]) {
 
     GLuint shaders = setup_shaders();
 
-    Matrix4f world = Matrix4f::identity()
-        .multiply(Matrix4f::rotation(-.78, Axis::X))
-        .multiply(Matrix4f::rotation(-.78, Axis::Y))
-        .multiply(Matrix4f::translation(-.5f, -.5f, 0.0f));
-    std::cerr << "world: " << world << std::endl;
-    auto gWorld = glGetUniformLocation(shaders, "gWorld");
-    glUniformMatrix4fv(gWorld, 1, GL_TRUE, &world.data[0][0]);
+    auto gTransform = glGetUniformLocation(shaders, "gTransform");
 
-    while (!glfwWindowShouldClose(window)) {
-        glClear(GL_COLOR_BUFFER_BIT);
+    double lastTime = 0.0;
+    while (!state.terminated) {
+        double time = glfwGetTime();
+        double delta = time - lastTime;
+        lastTime = time;
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        camera.move(state, delta);
+        Matrix4f transform = camera.getTransform();
+        glUniformMatrix4fv(gTransform, 1, GL_TRUE, &transform.data[0][0]);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
         glDrawElements(GL_LINES, 12, GL_UNSIGNED_INT, 0);
