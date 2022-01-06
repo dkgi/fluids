@@ -27,18 +27,109 @@ void on_error(int /* error */, const char* description) {
     warning(description);
 }
 
-struct Vector {
-    float x, y, z;
+enum class Axis { X, Y, Z };
+
+struct Matrix4f {
+    Matrix4f() {}
+
+    Matrix4f(const float data[4][4]) {
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                this->data[i][j] = data[i][j];
+            }
+        }
+    }
+
+    static Matrix4f identity() {
+        float data[4][4] = {
+            {1.0f, 0.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 1.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f, 1.0f},
+        };
+        return Matrix4f(data);
+    }
+
+    static Matrix4f translation(float x, float y, float z) {
+        Matrix4f result = Matrix4f::identity();
+        result.data[0][3] = x;
+        result.data[1][3] = y;
+        result.data[2][3] = z;
+        return result;
+    }
+
+    static Matrix4f rotation(float angle, Axis axis) {
+        Matrix4f result = Matrix4f::identity();
+        switch(axis) {
+            case Axis::X:
+                result.data[1][1] = cos(angle);
+                result.data[1][2] = -sin(angle);
+                result.data[2][1] = sin(angle);
+                result.data[2][2] = cos(angle);
+                break;
+            case Axis::Y:
+                result.data[0][0] = cos(angle);
+                result.data[0][2] = -sin(angle);
+                result.data[2][0] = sin(angle);
+                result.data[2][2] = cos(angle);
+                break;
+            case Axis::Z:
+                result.data[0][0] = cos(angle);
+                result.data[0][1] = -sin(angle);
+                result.data[1][0] = sin(angle);
+                result.data[1][1] = cos(angle);
+                break;
+        }
+        return result;
+    }
+
+    Matrix4f multiply(const Matrix4f& other) const {
+        Matrix4f result;
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                float product = 0.0f;
+                for (int k = 0; k < 4; k++) {
+                    product += data[i][k] * other.data[j][k];
+                }
+                result.data[j][i] = product;
+            }
+        }
+        return result;
+    }
+
+    float data[4][4] = {
+        {0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 0.0f},
+    };
 };
+
+std::ostream& operator<<(std::ostream& out, const Matrix4f& matrix) {
+    out << "{";
+    for (int i = 0; i < 4; i++) {
+        out << "{";
+        for (int j = 0; j < 4; j++) {
+            out << matrix.data[i][j];
+            if (j != 3) {
+                out << ", ";
+            }
+        }
+        if (i != 3) {
+            out << "}, ";
+        };
+    }
+    return out << "}";
+}
 
 const char* kVertexShader = R"(
 #version 330
 layout (location = 0) in vec3 position;
-uniform mat4 world;
+uniform mat4 gWorld;
 out vec4 Color;
 void main() {
-    gl_Position = world * vec4(position, 1.0);
-    Color = vec4(clamp(position, 0.0, 1.0), 1.0);
+    gl_Position = gWorld * vec4(position, 1.0);
+    Color = vec4(1.0, 1.0, 1.0, 1.0);
 }
 )";
 
@@ -123,11 +214,25 @@ int main(int argc, const char* argv[]) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
-    Vector vertices[] = {
-        Vector { -1.0f, -1.0f, 0.0f },
-        Vector { 0.0f, -1.0f, 1.0f },
-        Vector { 1.0f, -1.0f, 0.0f },
-        Vector { 0.0f, 1.0f, 0.0f },
+    float vertices[] = {
+        0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.5f, 0.0f, 0.0f,
+        0.5f, 1.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.5f,
+        0.0f, 1.0f, 0.5f,
+        0.5f, 0.0f, 0.5f,
+        0.5f, 1.0f, 0.5f,
+        1.0f, 0.0f, 0.5f,
+        1.0f, 1.0f, 0.5f,
+        0.0f, 0.0f, 1.0f,
+        0.0f, 1.0f, 1.0f,
+        0.5f, 0.0f, 1.0f,
+        0.5f, 1.0f, 1.0f,
+        1.0f, 0.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
     };
 
     GLuint VAO;
@@ -135,12 +240,15 @@ int main(int argc, const char* argv[]) {
     glBindVertexArray(VAO);
 
     GLuint VBO;
-    glGenBuffers(2, &VBO);
+    glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices) * sizeof(float), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
 
     GLuint IBO;
-    GLuint indices[] = {0, 3, 1, 1, 3, 2, 2, 3, 0, 0, 2, 1};
+    GLuint indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18};
     glGenBuffers(1, &IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
@@ -149,33 +257,19 @@ int main(int argc, const char* argv[]) {
 
     GLuint shaders = setup_shaders();
 
-    auto world = glGetUniformLocation(shaders, "world");
-    float transformation[4][4] = {
-        {1.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 1.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 1.0f},
-    };
-    glUniformMatrix4fv(world, 1, GL_TRUE, &transformation[0][0]);
-
+    Matrix4f world = Matrix4f::identity()
+        .multiply(Matrix4f::rotation(-.78, Axis::X))
+        .multiply(Matrix4f::rotation(-.78, Axis::Y))
+        .multiply(Matrix4f::translation(-.5f, -.5f, 0.0f));
+    std::cerr << "world: " << world << std::endl;
+    auto gWorld = glGetUniformLocation(shaders, "gWorld");
+    glUniformMatrix4fv(gWorld, 1, GL_TRUE, &world.data[0][0]);
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        auto time = glfwGetTime();
-        transformation[0][0] = cos(time);
-        transformation[0][2] = -sin(time);
-        transformation[2][0] = sin(time);
-        transformation[2][2] = cos(time);
-        glUniformMatrix4fv(world, 1, GL_TRUE, &transformation[0][0]);
-
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0);
-
-        glDisableVertexAttribArray(0);
+        glDrawElements(GL_LINES, 12, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
