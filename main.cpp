@@ -100,9 +100,9 @@ struct Matrix4f {
             for (int j = 0; j < 4; j++) {
                 float product = 0.0f;
                 for (int k = 0; k < 4; k++) {
-                    product += this->data[i][k] * other.data[j][k];
+                    product += this->data[i][k] * other.data[k][j];
                 }
-                result.data[j][i] = product;
+                result.data[i][j] = product;
             }
         }
         return result;
