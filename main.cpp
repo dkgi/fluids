@@ -148,24 +148,32 @@ std::ostream& operator<<(std::ostream& out, const Matrix4f& matrix) {
 }
 
 struct Camera {
-    float position[3] = {-.5f, -.5f, 1.0f};
+    float position[3] = {0.0f, 0.0f, 1.0f};
+    float rotation[3] = {0.0f, 0.0f, 0.0f};
     float fov = 1.5;  // ~90 degrees
     float near = 0.1;
     float far = 200.0;
 
     void move(const State& state, double delta) {
         double rate = 1.0;
-        if (state.key_pressed[GLFW_KEY_LEFT]) {
-            position[0] += rate * delta;
-        }
-        if (state.key_pressed[GLFW_KEY_RIGHT]) {
-            position[0] -= rate * delta;
-        }
-        if (state.key_pressed[GLFW_KEY_DOWN]) {
+        if (state.key_pressed[GLFW_KEY_Q]) {
             position[2] += rate * delta;
         }
-        if (state.key_pressed[GLFW_KEY_UP]) {
+        if (state.key_pressed[GLFW_KEY_E]) {
             position[2] -= rate * delta;
+        }
+
+        if (state.key_pressed[GLFW_KEY_W]) {
+            rotation[0] -= rate * delta;
+        }
+        if (state.key_pressed[GLFW_KEY_S]) {
+            rotation[0] += rate * delta;
+        }
+        if (state.key_pressed[GLFW_KEY_D]) {
+            rotation[1] -= rate * delta;
+        }
+        if (state.key_pressed[GLFW_KEY_A]) {
+            rotation[1] += rate * delta;
         }
     }
 
@@ -176,7 +184,10 @@ struct Camera {
                 Matrix4f::translation(
                     position[0],
                     position[1],
-                    position[2]));
+                    position[2]))
+            .multiply(Matrix4f::rotation(rotation[0], Axis::X))
+            .multiply(Matrix4f::rotation(rotation[1], Axis::Y))
+            .multiply(Matrix4f::rotation(rotation[2], Axis::Z));
     }
 } camera;
 
@@ -273,8 +284,8 @@ int main(int argc, const char* argv[]) {
     glfwSwapInterval(1);
 
     float vertices[] = {
-        0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
+        -1.0f, 0.0f, 0.0f,
+        -1.0f, 0.2f, 0.0f,
         0.5f, 0.0f, 0.0f,
         0.5f, 1.0f, 0.0f,
         1.0f, 0.0f, 0.0f,
