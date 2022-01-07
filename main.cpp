@@ -93,6 +93,20 @@ struct Matrix4f {
         }
         return result;
     }
+    
+    static Matrix4f perspective(int width, int height, float near, float far, float fov) {
+        float ratio = (float)width / height;
+        float range = far - near;
+        float tanFov = tan(fov / 2.0f);
+
+        Matrix4f result;
+        result.data[0][0] = 1.0f / (tanFov * ratio);
+        result.data[1][1] = 1.0f / tanFov;
+        result.data[2][2] = (-near - far) / range;
+        result.data[2][3] = 2.0f * far * near / range;
+        result.data[3][2] = 1.0f;
+        return result;
+    }
 
     Matrix4f multiply(const Matrix4f& other) const {
         Matrix4f result;
@@ -134,7 +148,10 @@ std::ostream& operator<<(std::ostream& out, const Matrix4f& matrix) {
 }
 
 struct Camera {
-    float position[3] = {-.5f, -.5f, -.5f};
+    float position[3] = {-.5f, -.5f, 1.0f};
+    float fov = 1.5;  // ~90 degrees
+    float near = 0.1;
+    float far = 200.0;
 
     void move(const State& state, double delta) {
         double rate = 1.0;
@@ -145,17 +162,16 @@ struct Camera {
             position[0] -= rate * delta;
         }
         if (state.key_pressed[GLFW_KEY_DOWN]) {
-            position[1] += rate * delta;
+            position[2] += rate * delta;
         }
         if (state.key_pressed[GLFW_KEY_UP]) {
-            position[1] -= rate * delta;
+            position[2] -= rate * delta;
         }
     }
 
-    Matrix4f getTransform() const {
+    Matrix4f getTransform(int width, int height) const {
         return Matrix4f::identity()
-            // .multiply(Matrix4f::rotation(-.78, Axis::X))
-            // .multiply(Matrix4f::rotation(-.78, Axis::Y))
+            .multiply(Matrix4f::perspective(width, height, near, far, fov))
             .multiply(
                 Matrix4f::translation(
                     position[0],
@@ -307,10 +323,14 @@ int main(int argc, const char* argv[]) {
         double delta = time - lastTime;
         lastTime = time;
 
+        int width, height;
+        glfwGetWindowSize(window, &width, &height);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         camera.move(state, delta);
-        Matrix4f transform = camera.getTransform();
+        Matrix4f transform = camera.getTransform(width, height);
+
         glUniformMatrix4fv(gTransform, 1, GL_TRUE, &transform.data[0][0]);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
