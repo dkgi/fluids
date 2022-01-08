@@ -9,6 +9,8 @@ project(fluids)
 
 add_library(main main.cpp)
 
+add_library(matrix matrix.cpp)
+
 find_package(glfw3 3.3 REQUIRED)
 target_link_libraries(main glfw)
 
@@ -21,3 +23,4 @@ target_link_libraries(main fmt::fmt)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS} -I/usr/local/lib -framework Cocoa -framework IOKit -framework CoreVideo -framework OpenGL -lglfw")
 
 add_executable(fluids main)
+target_link_libraries(fluids matrix)
