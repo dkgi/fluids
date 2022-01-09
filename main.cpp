@@ -40,8 +40,8 @@ void on_error(int /* error */, const char* description) {
 }
 
 struct Camera {
-    float position[3] = {0.0f, 0.0f, 1.0f};
-    float rotation[3] = {0.0f, 0.0f, 0.0f};
+    float position[3] = {0.0f, 0.0f, 2.5f};
+    float rotation[3] = {-.3f, 0.3f, 0.0f};
     float fov = 1.5;  // ~90 degrees
     float near = 0.1;
     float far = 200.0;
@@ -69,8 +69,8 @@ struct Camera {
         }
     }
 
-    Matrix4f getTransform(int width, int height) const {
-        return Matrix4f::identity()
+    void transform(GLuint shader, int width, int height) {
+        auto transform = Matrix4f::identity()
             .multiply(Matrix4f::perspective(width, height, near, far, fov))
             .multiply(
                 Matrix4f::translation(
@@ -80,6 +80,7 @@ struct Camera {
             .multiply(Matrix4f::rotation(rotation[0], Axis::X))
             .multiply(Matrix4f::rotation(rotation[1], Axis::Y))
             .multiply(Matrix4f::rotation(rotation[2], Axis::Z));
+        glUniformMatrix4fv(shader, 1, GL_TRUE, &transform.data[0][0]);
     }
 } camera;
 
@@ -154,6 +155,76 @@ GLuint setup_shaders() {
     return program;
 }
 
+struct Grid {
+    Grid(int N) : N(N) {
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray(VAO);
+
+        // Initialize vertex buffer
+        int vertices_size = N * N * N * 2 * 3 * sizeof(float);
+        vertices = (float*)malloc(vertices_size);
+        float delta = 2.0f / (N - 1);
+        for (int i = 0; i < N; i++) {
+            float x = -1.0f + i * delta;
+            for (int j = 0; j < N; j++) {
+                float y = -1.0f + j * delta;
+                for (int k = 0; k < N; k++) {
+                    float z = -1.0f + k * delta;
+
+                    int index = (i * N * N + j * N + k) * 2 * 3;
+
+                    vertices[index] = x; 
+                    vertices[index + 1] = y;
+                    vertices[index + 2] = z;
+                    vertices[index + 3] = x;
+                    vertices[index + 4] = y + delta / 3;
+                    vertices[index + 5] = z;
+                }
+            }
+        }
+
+        glGenBuffers(1, &VBO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, vertices_size, vertices, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        glEnableVertexAttribArray(0);
+
+        // Index buffer
+        int indices_size = N * N * N * 2 * sizeof(int);
+        indices = (int*)malloc(indices_size);
+        for (int i = 0; i < N * N * N * 2; i++) {
+            indices[i] = i;
+        }
+
+        glGenBuffers(1, &IBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_size, indices, GL_STATIC_DRAW);
+    }
+
+    virtual ~Grid() {
+        if (vertices != nullptr) {
+            free(vertices);
+        }
+        if (indices != nullptr) {
+            free(indices);
+        }
+    }
+
+    void draw() {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+        glDrawElements(GL_LINES, N * N * N * 2, GL_UNSIGNED_INT, 0);
+    }
+
+    GLuint VAO;
+    GLuint VBO;
+    GLuint IBO;
+
+    float* vertices = nullptr;
+    int* indices = nullptr;
+
+    int N = 3;
+};
+
 int main(int argc, const char* argv[]) {
     if (!glfwInit()) {
         fatal("Unable to initalize GLFW");
@@ -175,50 +246,11 @@ int main(int argc, const char* argv[]) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
-    // TODO: factor out
-    float vertices[] = {
-        -1.0f, 0.0f, 0.0f,
-        -1.0f, 0.2f, 0.0f,
-        0.5f, 0.0f, 0.0f,
-        0.5f, 1.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.5f,
-        0.0f, 1.0f, 0.5f,
-        0.5f, 0.0f, 0.5f,
-        0.5f, 1.0f, 0.5f,
-        1.0f, 0.0f, 0.5f,
-        1.0f, 1.0f, 0.5f,
-        0.0f, 0.0f, 1.0f,
-        0.0f, 1.0f, 1.0f,
-        0.5f, 0.0f, 1.0f,
-        0.5f, 1.0f, 1.0f,
-        1.0f, 0.0f, 1.0f,
-        1.0f, 1.0f, 1.0f,
-    };
-
-    GLuint VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-
-    GLuint VBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices) * sizeof(float), vertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-
-    GLuint IBO;
-    GLuint indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18};
-    glGenBuffers(1, &IBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    Grid grid(16);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     GLuint shaders = setup_shaders();
-
     auto gTransform = glGetUniformLocation(shaders, "gTransform");
 
     double lastTime = 0.0;
@@ -233,12 +265,9 @@ int main(int argc, const char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         camera.move(state, delta);
-        Matrix4f transform = camera.getTransform(width, height);
+        camera.transform(gTransform, width, height);
 
-        glUniformMatrix4fv(gTransform, 1, GL_TRUE, &transform.data[0][0]);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-        glDrawElements(GL_LINES, 12, GL_UNSIGNED_INT, 0);
+        grid.draw();
 
         glfwSwapBuffers(window);
         glfwPollEvents();
