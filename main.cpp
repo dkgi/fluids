@@ -7,6 +7,7 @@
 #include <OpenGL/gl3.h>
 
 #include "matrix.h"
+#include "simulation.h"
 
 void warning(const std::string& message) {
     std::cerr << "WARNING: " << message << std::endl;
@@ -156,36 +157,18 @@ GLuint setup_shaders() {
 }
 
 struct Grid {
-    Grid(int N) : N(N) {
+    Grid(const Simulation& simulation) : simulation(simulation) {
         glGenVertexArrays(1, &VAO);
         glBindVertexArray(VAO);
 
         // Initialize vertex buffer
+        int N = simulation.N;
         int vertices_size = N * N * N * 2 * 3 * sizeof(float);
         vertices = (float*)malloc(vertices_size);
-        float delta = 2.0f / (N - 1);
-        for (int i = 0; i < N; i++) {
-            float x = -1.0f + i * delta;
-            for (int j = 0; j < N; j++) {
-                float y = -1.0f + j * delta;
-                for (int k = 0; k < N; k++) {
-                    float z = -1.0f + k * delta;
-
-                    int index = (i * N * N + j * N + k) * 2 * 3;
-
-                    vertices[index] = x; 
-                    vertices[index + 1] = y;
-                    vertices[index + 2] = z;
-                    vertices[index + 3] = x;
-                    vertices[index + 4] = y + delta / 3;
-                    vertices[index + 5] = z;
-                }
-            }
-        }
 
         glGenBuffers(1, &VBO);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, vertices_size, vertices, GL_STATIC_DRAW);
+
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glEnableVertexAttribArray(0);
 
@@ -211,6 +194,31 @@ struct Grid {
     }
 
     void draw() {
+        int N = simulation.N;
+
+        float delta = 2.0f / (N - 1);
+        for (int i = 0; i < N; i++) {
+            float x = -1.0f + i * delta;
+            for (int j = 0; j < N; j++) {
+                float y = -1.0f + j * delta;
+                for (int k = 0; k < N; k++) {
+                    float z = -1.0f + k * delta;
+
+                    int simulation_index = i * N * N + j * N + k;
+                    int index = simulation_index * 2 * 3;
+
+                    vertices[index] = x; 
+                    vertices[index + 1] = y;
+                    vertices[index + 2] = z;
+                    vertices[index + 3] = x;
+                    vertices[index + 4] = y + delta * simulation.data[simulation_index];
+                    vertices[index + 5] = z;
+                }
+            }
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, N * N * N * 2 * 3 * sizeof(float), vertices, GL_DYNAMIC_DRAW);
+
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
         glDrawElements(GL_LINES, N * N * N * 2, GL_UNSIGNED_INT, 0);
     }
@@ -222,7 +230,7 @@ struct Grid {
     float* vertices = nullptr;
     int* indices = nullptr;
 
-    int N = 3;
+    const Simulation& simulation;
 };
 
 int main(int argc, const char* argv[]) {
@@ -246,7 +254,8 @@ int main(int argc, const char* argv[]) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
-    Grid grid(16);
+    Simulation simulation(16);
+    Grid grid(simulation);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -264,6 +273,7 @@ int main(int argc, const char* argv[]) {
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        simulation.update(time);
         camera.move(state, delta);
         camera.transform(gTransform, width, height);
 
