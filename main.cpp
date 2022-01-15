@@ -157,12 +157,11 @@ GLuint setup_shaders() {
 }
 
 struct Grid {
-    Grid(const Simulation& simulation) : simulation(simulation) {
+    Grid(int N) : N(N) {
         glGenVertexArrays(1, &VAO);
         glBindVertexArray(VAO);
 
         // Initialize vertex buffer
-        int N = simulation.N;
         int vertices_size = N * N * N * 2 * 3 * sizeof(float);
         vertices = (float*)malloc(vertices_size);
 
@@ -193,9 +192,7 @@ struct Grid {
         }
     }
 
-    void draw() {
-        int N = simulation.N;
-
+    void draw(float* data) {
         float delta = 2.0f / (N - 1);
         for (int i = 0; i < N; i++) {
             float x = -1.0f + i * delta;
@@ -204,14 +201,14 @@ struct Grid {
                 for (int k = 0; k < N; k++) {
                     float z = -1.0f + k * delta;
 
-                    int simulation_index = i * N * N + j * N + k;
-                    int index = simulation_index * 2 * 3;
+                    int data_index = i * N * N + j * N + k;
+                    int index = data_index * 2 * 3;
 
                     vertices[index] = x; 
                     vertices[index + 1] = y;
                     vertices[index + 2] = z;
                     vertices[index + 3] = x;
-                    vertices[index + 4] = y + delta * simulation.data[simulation_index];
+                    vertices[index + 4] = y + delta * data[data_index];
                     vertices[index + 5] = z;
                 }
             }
@@ -230,7 +227,7 @@ struct Grid {
     float* vertices = nullptr;
     int* indices = nullptr;
 
-    const Simulation& simulation;
+    const int N;
 };
 
 int main(int argc, const char* argv[]) {
@@ -254,8 +251,9 @@ int main(int argc, const char* argv[]) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
-    Simulation simulation(16);
-    Grid grid(simulation);
+    int N = 16;
+    Simulation simulation(N);
+    Grid grid(N);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -274,10 +272,11 @@ int main(int argc, const char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         simulation.update(time);
+
         camera.move(state, delta);
         camera.transform(gTransform, width, height);
 
-        grid.draw();
+        grid.draw(simulation.data);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
