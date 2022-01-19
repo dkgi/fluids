@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <vector>
 
 #define GL_SILENCE_DEPRECATION
 
@@ -192,7 +193,7 @@ struct Grid {
         }
     }
 
-    void draw(float* data) {
+    void draw(Data data) {
         float delta = 2.0f / (N - 1);
         for (int i = 0; i < N; i++) {
             float x = -1.0f + i * delta;
@@ -204,12 +205,14 @@ struct Grid {
                     int data_index = i * N * N + j * N + k;
                     int index = data_index * 2 * 3;
 
+                    const auto& data_vector = data[i][j][k];
+
                     vertices[index] = x; 
                     vertices[index + 1] = y;
                     vertices[index + 2] = z;
-                    vertices[index + 3] = x;
-                    vertices[index + 4] = y + delta * data[data_index];
-                    vertices[index + 5] = z;
+                    vertices[index + 3] = x + delta * data_vector.x;
+                    vertices[index + 4] = y + delta * data_vector.y;
+                    vertices[index + 5] = z + delta * data_vector.z;
                 }
             }
         }
